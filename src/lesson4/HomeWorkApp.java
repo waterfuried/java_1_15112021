@@ -81,68 +81,83 @@ public class HomeWorkApp {
         return wrong;
     }
 
-    // проверить наличие выигрыша по линии:
-    // 0=строка, 1=столбец, 2=диагональ (СЗ-ЮВ), 3=обратная диагональ(СВ-ЮЗ)
-    static boolean testLine (int x, int y, int type) {
-        int dx = 0, dy = 0;
-        switch (type) {
-            case 0: dx = 1; break;
-            case 1: dy = 1; break;
-            case 2: dx = 1; dy = 1; break;
-            case 3: dx = -1; dy = 1;
-        }
-        boolean steady = map[y][x] != EMPTY;
-        for (int i = 1; steady && i < WINSIZE; i++) {
-            int curY = y + i * dy, curX = x + i * dx;
-            steady = curY >= 0 && curX >= 0 && map[curY][curX] == map[y][x];
-        }
-        return steady;
+    // заменяет 2 первоначально отдельных метода -
+    // проверку наличия выигрыша и расчет весов линий -
+    // поскольку обход линий поля в них происходил одинаково
+    static boolean processAllLines (boolean checkWin) {
+        boolean won = false;
+        for (int y = 0; !won && y < GAMESIZE; y++)
+            for (int x = 0; !won && x < GAMESIZE; x++)
+                for (int t = 0; !won && t <= 3; t++) {
+                    // нужно ли проверять линию дальше?
+                    boolean checking = x + WINSIZE <= GAMESIZE, checkY = y + WINSIZE <= GAMESIZE;
+                    if (t == 1) checking = checkY;
+                    if (t == 2) checking &= checkY;
+                    if (t == 3) checking = x + 1 - WINSIZE >= 0 && checkY;
+                    if (checking)
+                        if (checkWin)
+                            won = passAlong(x, y, t, 1) == 1;
+                        else
+                            passAlong(x, y, t, 2);
+                }
+        return won;
     }
 
-    // найти первую пустую ячейку на линии:
-    // 0=строка, 1=столбец, 2=диагональ (СЗ-ЮВ), 3=обратная диагональ(СВ-ЮЗ)
-    static int findEmpty (int x, int y, int type) {
-        if (map[y][x] == EMPTY) return encCellNum(y, x);
-        int dx = 0, dy = 0;
-        switch (type) {
-            case 0: dx = 1; break;
-            case 1: dy = 1; break;
-            case 2: dx = 1; dy = 1; break;
-            case 3: dx = -1; dy = 1;
-        }
-        int i = 1, curX, curY;
-        boolean found;
-        do {
-            curY = y + i * dy;
-            curX = x + i * dx;
-            found = curY >= 0 && curX >= 0 && map[curY][curX] == EMPTY;
-            i++;
-        } while (!found && i < WINSIZE);
-        return found ? encCellNum(curY, curX) : -1;
-    }
-
-    // рассчитать вес по линии для игрока/компьютера
-    // 0=строка, 1=столбец, 2=диагональ (СЗ-ЮВ), 3=обратная диагональ(СВ-ЮЗ)
-    static void calcLineWeight (int x, int y, int type) {
+    /** выполнить проход по линии
+     * метод заменяет 3 первоначальных,
+     * имевших разные типы возвращаемого значения
+     * @param x     x-координата начала линии
+     * @param y     y-координата начала линии
+     * @param type  тип линии (0=строка, 1=столбец, 2=диагональ СЗ-ЮВ, 3=обратная диагональ СВ-ЮЗ)
+     * @param task  назначение прохода:
+     *                  0 = поиск свободной ячейки
+     *                  1 = проверка наличия выигрыша
+     *                  2 = расчет ее веса
+     * @return зависит от назначения прохода:
+     *                  0 : индекс первой свободной ячейки
+     *                  1 : 1=выигрыш есть, 0=нет
+     *                  2 : 0, корректируется массив весов
+     */
+    static int passAlong(int x, int y, int type, int task) {
+        if (task == 0 && map[y][x] == EMPTY) return encCellNum(y, x);
         int dx = 0, dy = 0, d = GAMESIZE - WINSIZE + 1, lineIdx = 0;
         switch (type) {
             case 0: dx = 1; break;
-            case 1: dy = 1; lineIdx = GAMESIZE * d; break;
-            case 2: dx = 1; dy = 1; lineIdx = 2 * GAMESIZE * d; break;
-            // поскольку в вызывающем методе движение индекса происходит сначала внутри строки (по столбцам),
-            // соответственно и обратные диагонали нужно искать, отталкиваясь от индекса столбца -
-            // покрытие игрового поля линиями возможных ходов при этом не нарушается
-            case 3: dx = -1; dy = 1; lineIdx = d * (2 * GAMESIZE + d);
+            case 1: dy = 1; break;
+            case 2: dx = 1; dy = 1; break;
+            case 3: dx = -1; dy = 1;
         }
-        if (type == 1)
-            lineIdx += x * d + (d > 1 ? y % d : 0);
-        else
-            lineIdx += y * d + (d > 1 ? (type < 3 ? x : (GAMESIZE - x)) % d : 0);
-        for (int i = 0; i < WINSIZE; i++) {
-            int curY = y + i * dy, curX = x + i * dx;
-            if (curY >= 0 && curX >= 0 && map[curY][curX] != EMPTY) {
-                weight[map[curY][curX] == getPlayerChar() ? 0 : 1][lineIdx]++;
+        if (task == 2) {
+            switch (type) {
+                case 1: lineIdx = GAMESIZE * d; break;
+                case 2: lineIdx = 2 * GAMESIZE * d; break;
+                // поскольку в вызывающем методе движение индекса происходит сначала внутри строки (по столбцам),
+                // соответственно и обратные диагонали нужно искать, отталкиваясь от индекса столбца -
+                // покрытие игрового поля линиями возможных ходов при этом не нарушается
+                case 3: lineIdx = d * (2 * GAMESIZE + d);
             }
+            if (type == 1)
+                lineIdx += x * d + (d > 1 ? y % d : 0);
+            else
+                lineIdx += y * d + (d > 1 ? (type < 3 ? x : (GAMESIZE - x)) % d : 0);
+        }
+        int i0 = task == 2 ? 0 : 1, curX = x, curY = y;
+        boolean cond = task != 1 || map[y][x] != EMPTY;
+        for (int i = i0; cond && i < WINSIZE; i++) {
+            curY = y + i * dy;
+            curX = x + i * dx;
+            switch (task) {
+                case 0: cond = curY >= 0 && curX >= 0 && map[curY][curX] != EMPTY; break;
+                case 1: cond = curY >= 0 && curX >= 0 && map[curY][curX] == map[y][x]; break;
+                case 2: if (curY >= 0 && curX >= 0 && map[curY][curX] != EMPTY) {
+                            weight[map[curY][curX] == getPlayerChar() ? 0 : 1][lineIdx]++;
+                        }
+            }
+        }
+        switch (task) {
+            case 0: return cond ? -1 : encCellNum(curY, curX);
+            case 1: return cond ? 1 : 0;
+            default: return 0;
         }
     }
 
@@ -153,18 +168,10 @@ public class HomeWorkApp {
     */
     static void makeWeights () {
         for (int y = 0; y < weight.length; y++)
-            for (int x = 0; x < weight[0].length; x++)
+            for (int x = 0; x < weight[0].length; x++) {
                 weight[y][x] = 0;
-        for (int y = 0; y < GAMESIZE; y++)
-            for (int x = 0; x < GAMESIZE; x++)
-                for (int t = 0; t <= 3; t++) {
-                    // нужно ли проверять линию дальше?
-                    boolean checking = x + WINSIZE <= GAMESIZE, checkY = y + WINSIZE <= GAMESIZE;
-                    if (t == 1) checking = checkY;
-                    if (t == 2) checking &= checkY;
-                    if (t == 3) checking = x + 1 - WINSIZE >= 0 && checkY;
-                    if (checking) calcLineWeight(x, y, t);
-                }
+            }
+        processAllLines(false);
     }
 
     /*
@@ -196,8 +203,7 @@ public class HomeWorkApp {
             совпадала с длиной стороны игрового поля
      */
     static int findFreeCell (int weightIdx) {
-        int d = GAMESIZE - WINSIZE + 1, type = 0;
-        int lineIdx, x, y;
+        int d = GAMESIZE - WINSIZE + 1, type = 0, lineIdx, x, y;
         if (weightIdx >= d * (2 * GAMESIZE + d)) {
             lineIdx = weightIdx - d * (2 * GAMESIZE + d);
             type = 3;
@@ -211,6 +217,7 @@ public class HomeWorkApp {
             type = 1;
         }
         else lineIdx = weightIdx;
+
         y = lineIdx / d;
         x = lineIdx % d;
         if (type == 1) {
@@ -218,7 +225,8 @@ public class HomeWorkApp {
             y = lineIdx % d;
         }
         if (type == 3) x += (WINSIZE - 1);
-        return findEmpty(x, y, type);
+
+        return passAlong(x, y, type, 0);
     }
 
     // поиск лучшего решения для компьютера
@@ -311,18 +319,7 @@ public class HomeWorkApp {
 
     // проверка наличия выигрыша
     static boolean isGameWon () {
-        boolean won = false;
-        for (int y = 0; !won && y < GAMESIZE; y++)
-            for (int x = 0; !won && x < GAMESIZE; x++)
-                for (int t = 0; !won && t <= 3; t++) {
-                    // нужно ли проверять линию дальше?
-                    boolean checking = x + WINSIZE <= GAMESIZE, checkY = y + WINSIZE <= GAMESIZE;
-                    if (t == 1) checking = checkY;
-                    if (t == 2) checking &= checkY;
-                    if (t == 3) checking = x + 1 - WINSIZE >= 0 && checkY;
-                    if (checking) won = testLine(x, y, t);
-                }
-        return won;
+        return processAllLines(true);
     }
 
     // проверить игру на ничью - нет пустых клеток
