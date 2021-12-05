@@ -30,7 +30,6 @@ public class HomeWorkApp {
         Dog dog3 = new Dog("Шарик");
         dog3.setMaxSwimDistance(20);
 
-        cat1.printGender();
         cat1.run(250);
         cat2.swim(1);
         cat3.run(300);
@@ -39,9 +38,7 @@ public class HomeWorkApp {
         cat4.run(200);
 
         dog1.run(500);
-        dog2.printGender();
         dog2.run(450);
-        dog2.printGender();
         dog2.swim(5);
         dog3.swim(3);
         dog3.run(550);

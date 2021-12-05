@@ -73,6 +73,7 @@ public abstract class Animal {
 
     void printNameAndAction (String action, boolean done, int obstLength) {
         printName();
+        printGender();
         System.out.println((done ? "" : "не ") + action + (male ? "" : "а") + " " + obstLength + "м");
     }
 
